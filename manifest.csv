@@ -1,0 +1,11 @@
+old_name,new_name
+project_old.py,project_new.py
+data_raw.csv,data_clean.csv
+config_v1.yaml,config_v2.yaml
+notes_draft.txt,notes_final.txt
+README_old.md,README.md
+setup_legacy.py,setup.py
+test_old.py,test_main.py
+utils_helper.py,utils.py
+schema_v1.json,schema_v2.json
+CHANGELOG_old.txt,CHANGELOG.txt
