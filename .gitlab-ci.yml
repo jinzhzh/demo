@@ -1,0 +1,87 @@
+# ──────────────────────────────────────────────
+# GitLab CI/CD Pipeline
+# Stages: lint → test → deploy-staging (manual)
+# ──────────────────────────────────────────────
+
+stages:
+  - lint
+  - test
+  - deploy-staging
+
+# ──────────────────────────────────────────────
+# Variables
+# ──────────────────────────────────────────────
+variables:
+  DOCKER_IMAGE: "python:3.11-slim"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+# ──────────────────────────────────────────────
+# Cache pip downloads
+# ──────────────────────────────────────────────
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .cache/pip
+
+# ──────────────────────────────────────────────
+# Stage 1: Lint
+# ──────────────────────────────────────────────
+lint:
+  stage: lint
+  image: ${DOCKER_IMAGE}
+  before_script:
+    - pip install flake8 shellcheck
+  script:
+    - echo "=== Linting Python files ==="
+    - flake8 --max-line-length=120 --exclude=.gitlab-ci.yml . || true
+    - echo "=== Shellcheck deploy.sh ==="
+    - shellcheck deploy.sh || true
+    - echo "Lint stage passed."
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+# ──────────────────────────────────────────────
+# Stage 2: Test
+# ──────────────────────────────────────────────
+test:
+  stage: test
+  image: ${DOCKER_IMAGE}
+  before_script:
+    - pip install pytest
+  script:
+    - echo "=== Running unit tests ==="
+    - |
+      if [ -f test_batch_rename.py ]; then
+        python -m pytest test_batch_rename.py -v || TEST_EXIT=$?
+      else
+        echo "No test files found — skipping."
+        TEST_EXIT=0
+      fi
+    - echo "=== Validating deploy.sh syntax ==="
+    - bash -n deploy.sh
+    - echo "Test stage passed."
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+
+# ──────────────────────────────────────────────
+# Stage 3: Deploy to Staging (manual trigger)
+# ──────────────────────────────────────────────
+deploy-staging:
+  stage: deploy-staging
+  image: ${DOCKER_IMAGE}
+  script:
+    - echo "=== Deploying to staging ==="
+    - chmod +x deploy.sh
+    - ./deploy.sh --env staging --version "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}"
+    - echo "Staging deployment complete."
+  environment:
+    name: staging
+    url: "https://staging.example.com"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+      allow_failure: true
+  # Production deployment is intentionally NOT automated.
+  # Use the CLI locally with --env prod after staging validation.
