@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict'; import { 创建LIS } from '../src/app.js';
+const lis = 创建LIS();
+const 病人 = { 姓名: '张三', 性别: '男', 年龄: 46, 身份证号: '310101198001010011', 手机: '13800000000' };
+const 标本 = lis.标本.接收({ 机构ID: 'HOSP-A', 患者: 病人, 项目ID列表: ['GLU'], 操作人ID: 'u-receive' });
+const 批次 = lis.仪器.创建批次({ 仪器ID: 'ANA-01', 批次号: '20260715-01' }); lis.质控.判定({ 批次ID: 批次.id, 合格: true, 操作人ID: 'u-qc' });
+const 帧 = `MSH|^~\\&|ANALYZER|HOSP-A|LIS|HOSP-A|20260715152000||ORU^R01|MSG00001|P|2.5\nPID|||PTK-1||脱敏患者||19800101|M\nOBR|1|ORD1|${标本.id}|GLU^葡萄糖\nOBX|1|NM|GLU^葡萄糖||2.1|mmol/L|3.9-6.1|L|||F`;
+const 上机 = lis.仪器.接收HL7({ 机构ID: 'HOSP-A', 仪器ID: 'ANA-01', 批次ID: 批次.id, 文本: 帧, 操作人ID: 'u-tech' }); assert.equal(上机.结果.危急, true); assert.match(上机.应答, /MSA\|AA/);
+assert.throws(() => lis.报告.签发({ 标本ID: 标本.id, 签发人ID: 'u-review-2' }), /未审核/);
+lis.审核.审核({ 结果ID: 上机.结果.id, 审核人ID: 'u-review-1', 审核级别: '初审' }); assert.throws(() => lis.报告.签发({ 标本ID: 标本.id, 签发人ID: 'u-review-2' }), /未审核/);
+lis.审核.审核({ 结果ID: 上机.结果.id, 审核人ID: 'u-review-2', 审核级别: '复审' }); const 报告 = lis.报告.签发({ 标本ID: 标本.id, 签发人ID: 'u-review-2' }); assert.equal(报告.状态, '已签发'); assert.match(报告.HTML, /检验报告单/);
+const 外送标本 = lis.标本.接收({ 机构ID: 'HOSP-A', 患者: 病人, 项目ID列表: ['TSH'], 操作人ID: 'u-receive' }); const 转检 = lis.转检.外送({ 源标本ID: 外送标本.id, 目标机构ID: 'LAB-B', 操作人ID: 'u-referral', 项目ID列表: ['TSH'] }); const 合作视图 = lis.转检.合作机构视图({ 单号: 转检.单号, 当前机构ID: 'LAB-B' }); assert.equal(合作视图.姓名, undefined); assert.equal(合作视图.身份证号, undefined); lis.转检.回传({ 单号: 转检.单号, 当前机构ID: 'LAB-B', 结果值: 2.3, 单位: 'mIU/L', 审核摘要: '合作机构双人审核完成' }); assert.equal(转检.状态, '已回传');
+const 锁定标本 = lis.标本.接收({ 机构ID: 'HOSP-A', 患者: 病人, 项目ID列表: ['GLU'], 操作人ID: 'u-receive' }); const 锁定批次 = lis.仪器.创建批次({ 仪器ID: 'ANA-01', 批次号: '20260715-02' }); const 锁定帧 = 帧.replace(标本.id, 锁定标本.id).replace('MSG00001', 'MSG00002').replace('2.1', '5.0'); const 锁定结果 = lis.仪器.接收HL7({ 机构ID: 'HOSP-A', 仪器ID: 'ANA-01', 批次ID: 锁定批次.id, 文本: 锁定帧, 操作人ID: 'u-tech' }).结果; lis.质控.判定({ 批次ID: 锁定批次.id, 合格: false, 操作人ID: 'u-qc' }); assert.equal(锁定结果.状态, '已锁定'); assert.throws(() => lis.审核.审核({ 结果ID: 锁定结果.id, 审核人ID: 'u-review-1', 审核级别: '初审' }), /已锁定/);
+console.log('验收通过：标本→上机→危急值双签→PDF报告，及1例脱敏外送转检；质控失控锁定均已验证。');

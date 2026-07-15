@@ -1,0 +1,3 @@
+import { 种子数据 } from './data/seed.js';
+import { 审计服务 } from './services/audit-service.js'; import { 标本服务 } from './services/specimen-service.js'; import { 仪器服务 } from './services/instrument-service.js'; import { 质控服务 } from './services/qc-service.js'; import { 审核服务 } from './services/review-service.js'; import { 报告服务 } from './services/report-service.js'; import { 转检服务 } from './services/referral-service.js';
+export function 创建LIS() { const 数据库 = { ...种子数据(), 标本: [], 结果: [], 批次: [], 仪器报文: [], 危急值: [], 报告: [], 转检: [], 审计: [] }; const 审计 = new 审计服务(数据库); return { 数据库, 标本: new 标本服务(数据库, 审计), 仪器: new 仪器服务(数据库, 审计), 质控: new 质控服务(数据库, 审计), 审核: new 审核服务(数据库, 审计), 报告: new 报告服务(数据库, 审计), 转检: new 转检服务(数据库, 审计) }; }
