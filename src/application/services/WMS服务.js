@@ -1,0 +1,13 @@
+class 业务错误 extends Error {}
+class WMS服务 {
+  constructor(){this.商品=new Map;this.仓库=new Map;this.库位=new Map;this.库存=new Map;this.ASN=new Map;this.波次=new Map;this.调拨=new Map;this.流水=[]}
+  加商品(x){this.商品.set(x.编号,x)} 加仓库(x){this.仓库.set(x.编号,{...x,盘点锁定:false})} 加库位(x){this.库位.set(x.编号,{...x,已用体积:0})}
+  收货上架(编号){const a=this.ASN.get(编号);if(!a)throw new 业务错误('ASN不存在');for(const 行 of a.明细){const 商品=this.商品.get(行.商品编号);const 库位=[...this.库位.values()].filter(x=>x.仓库编号===a.仓库编号&&x.已用体积+商品.单件体积*行.数量<=x.容量).sort((x,y)=>(y.周转等级*商品.周转率)-(x.周转等级*商品.周转率)||((y.容量-y.已用体积)-(x.容量-x.已用体积)))[0];if(!库位)throw new 业务错误('无可用库位');库位.已用体积+=商品.单件体积*行.数量;const id=`${a.仓库编号}/${库位.编号}/${行.商品编号}/${行.批次}`;const 库存=this.库存.get(id)||{编号:id,仓库编号:a.仓库编号,库位编号:库位.编号,商品编号:行.商品编号,批次:行.批次,可用:0,已分配:0};库存.可用+=行.数量;this.库存.set(id,库存);this.流水.push({类型:'ASN入库',数量:行.数量,关联:a.编号})}a.状态='已完成'}
+  创建波次(编号,仓库编号,商品编号,数量){if(this.仓库.get(仓库编号).盘点锁定)throw new 业务错误('盘点锁库期间不可出库');let 剩余=数量,明细=[];const 商品=this.商品.get(商品编号);for(const s of [...this.库存.values()].filter(x=>x.仓库编号===仓库编号&&x.商品编号===商品编号&&x.可用>0)){const q=Math.min(s.可用,剩余);s.可用-=q;s.已分配+=q;明细.push({库存编号:s.编号,数量:q,模式:q%商品.整件规格===0?'整件':'拆零'});剩余-=q;if(!剩余)break}if(剩余>0)throw new 业务错误('库存不足，禁止负库存');const w={编号,仓库编号,商品编号,数量,明细,状态:'待复核'};this.波次.set(编号,w);return w}
+  复核打包(编号){const w=this.波次.get(编号);for(const d of w.明细){const s=this.库存.get(d.库存编号);if(s.已分配<d.数量)throw new 业务错误('复核数量不正确');s.已分配-=d.数量;this.流水.push({类型:'复核出库',数量:-d.数量,关联:编号})}w.状态='已完成'}
+  库内移位(库存编号,目标库位编号,数量){const s=this.库存.get(库存编号),目标=this.库位.get(目标库位编号),商品=this.商品.get(s.商品编号);if(s.可用<数量)throw new 业务错误('库存不足，禁止负库存');if(!目标||目标.仓库编号!==s.仓库编号)throw new 业务错误('目标库位不合法');s.可用-=数量;const id=`${s.仓库编号}/${目标库位编号}/${s.商品编号}/${s.批次}`,t=this.库存.get(id)||{...s,编号:id,库位编号:目标库位编号,可用:0,已分配:0};t.可用+=数量;目标.已用体积+=商品.单件体积*数量;this.库存.set(id,t)}
+  发运调拨(编号){const t=this.调拨.get(编号);if(this.仓库.get(t.源仓).盘点锁定)throw new 业务错误('盘点锁库期间不可出库');const s=[...this.库存.values()].find(x=>x.仓库编号===t.源仓&&x.商品编号===t.商品编号&&x.批次===t.批次&&x.可用>=t.数量);if(!s)throw new 业务错误('库存不足，禁止负库存');s.可用-=t.数量;t.状态='运输中';this.流水.push({类型:'调拨发运',数量:-t.数量,关联:编号})}
+  收货调拨(编号,库位编号){const t=this.调拨.get(编号),id=`${t.目的仓}/${库位编号}/${t.商品编号}/${t.批次}`,s=this.库存.get(id)||{编号:id,仓库编号:t.目的仓,库位编号,商品编号:t.商品编号,批次:t.批次,可用:0,已分配:0};s.可用+=t.数量;this.库存.set(id,s);t.状态='已入库';this.流水.push({类型:'调拨收货',数量:t.数量,关联:编号})}
+  盘点纠差(仓库编号,库存编号,实盘){const 仓=this.仓库.get(仓库编号);仓.盘点锁定=true;const s=this.库存.get(库存编号);if(s.仓库编号!==仓库编号||实盘<0)throw new 业务错误('盘点数据不合法');const 差异=实盘-s.可用;s.可用=实盘;this.流水.push({类型:'盘点纠差',数量:差异,关联:库存编号});仓.盘点锁定=false;return 差异}
+  总库存(商品编号){return [...this.库存.values()].filter(x=>x.商品编号===商品编号).reduce((n,x)=>n+x.可用+x.已分配,0)}
+} module.exports={WMS服务,业务错误};

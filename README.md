@@ -1,2 +1,4 @@
-# demo
-Demo repository for development exercises
+# 智能仓储 WMS（多仓版）
+
+全中文源码。运行：`npm run demo`。
+模块：库位图、ASN、上架、波次拣货、复核打包、移位、盘点、调拨。
