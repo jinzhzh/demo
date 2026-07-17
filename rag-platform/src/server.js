@@ -1,0 +1,1 @@
+const http=require('http'),{RAG}=require('./app');new RAG();http.createServer((q,r)=>r.end(JSON.stringify({service:'私有化知识库 RAG 平台',status:'ok'}))).listen(process.env.PORT||3000,()=>console.log('平台已启动'));

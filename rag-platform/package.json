@@ -1,0 +1,1 @@
+{"name":"private-rag-platform","version":"1.0.0","private":true,"scripts":{"demo":"node scripts/acceptance.js","start":"node src/server.js"}}
