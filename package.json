@@ -1,0 +1,1 @@
+{"name":"mini-k8s-scheduler","version":"1.0.0","private":true,"type":"module","scripts":{"demo":"node src/cli/mini-k8s.js demo","cluster":"node src/cli/mini-k8s.js"},"bin":{"mini-k8s":"src/cli/mini-k8s.js"}}
